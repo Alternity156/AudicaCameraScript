@@ -1,0 +1,6 @@
+
+*.CopyComplete
+*.cache
+CameraScript/obj/Release/CameraScript.csproj.FileListAbsolute.txt
+*.dll
+*.pdb
