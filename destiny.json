@@ -1,0 +1,25 @@
+{
+	"fov": 80,
+	"cameraCues": [
+		{
+			"tick": 0,
+			"tickLength": 1920,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -60.6,
+			"xRot": 0.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		},
+		{
+			"tick": 2880,
+			"tickLength": 1920,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -2.6,
+			"xRot": 0.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		}
+	]
+}
