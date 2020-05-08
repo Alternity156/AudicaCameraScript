@@ -1,19 +1,59 @@
 {
-	"fov": 80,
+	"fov": 100.0,
 	"cameraCues": [
 		{
 			"tick": 0,
-			"tickLength": 1920,
+			"tickLength": 120,
 			"xPos": 0.0,
 			"yPos": 2.4,
 			"zPos": -60.6,
+			"xRot": 90.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		},
+		{
+			"tick": 480,
+			"tickLength": 120,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -2.6,
 			"xRot": 0.0,
 			"yRot": 0.0,
 			"zRot": 0.0
 		},
 		{
-			"tick": 2880,
-			"tickLength": 1920,
+			"tick": 960,
+			"tickLength": 120,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -60.6,
+			"xRot": -90.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		},
+		{
+			"tick": 1440,
+			"tickLength": 120,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -2.6,
+			"xRot": 0.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		},
+		{
+			"tick": 1920,
+			"tickLength": 120,
+			"xPos": 0.0,
+			"yPos": 2.4,
+			"zPos": -60.6,
+			"xRot": 90.0,
+			"yRot": 0.0,
+			"zRot": 0.0
+		},
+		{
+			"tick": 2400,
+			"tickLength": 120,
 			"xPos": 0.0,
 			"yPos": 2.4,
 			"zPos": -2.6,

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.IO;
+using Il2CppSystem.Linq;
 using MelonLoader;
 using NET_SDK;
 using NET_SDK.Harmony;
 using UnityEngine;
-using NET_SDK.Reflection;
-using UnityEngine.UI;
-using Il2CppSystem.Xml.Serialization;
 
 namespace CameraScript
 {
@@ -23,6 +21,10 @@ namespace CameraScript
     {
         public static Patch SpectatorCam_Update;
         public static Patch SongSelectItem_OnSelect;
+        public static Patch InGameUI_Restart;
+        public static Patch InGameUI_ReturnToSongList;
+
+        public static Vector3 debugTextPos = new Vector3(0f, -1f, 5f);
 
         public static bool camOK = false;
         public static bool isMouseAwake = false;
@@ -50,6 +52,7 @@ namespace CameraScript
 
         public static float lastTick;
         public static float oldLastTick;
+        public static bool ended = false;
 
         public static int currentCameraCueIndex;
         public static Vector3 startPointPos;
@@ -101,6 +104,7 @@ namespace CameraScript
             if (!File.Exists(path)) { return false; }
 
             cameraCues = Decoder.GetCameraCues(File.ReadAllText(path));
+            SpawnText("Camera cues loaded");
 
             return true;
         }
@@ -122,14 +126,47 @@ namespace CameraScript
             spectatorCam.UpdateFOV();
         }
 
+        public static void ResetState()
+        {
+            lastTick = 0;
+            oldLastTick = 0;
+            currentCameraCueIndex = 0;
+            ended = false;
+        }
+
+        public static void SpawnText(string text)
+        {
+            KataConfig.I.CreateDebugText(text, debugTextPos, 5f, null, persistent: false, 0.2f);
+        }
+
         public override void OnApplicationStart()
         {
             if (!Directory.Exists(dir)) { Directory.CreateDirectory(Application.dataPath + "/../Mods/Config/CameraScript"); }
 
             Instance instance = Manager.CreateInstance("CameraScript");
 
-            CameraScript.SpectatorCam_Update = instance.Patch(SDK.GetClass("SpectatorCam").GetMethod("Update"), typeof(CameraScript).GetMethod("SpectatorCamUpdate"));
-            CameraScript.SongSelectItem_OnSelect = instance.Patch(SDK.GetClass("SongSelectItem").GetMethod("OnSelect"), typeof(CameraScript).GetMethod("OnSelect"));
+            SpectatorCam_Update = instance.Patch(SDK.GetClass("SpectatorCam").GetMethod("Update"), typeof(CameraScript).GetMethod("SpectatorCamUpdate"));
+            SongSelectItem_OnSelect = instance.Patch(SDK.GetClass("SongSelectItem").GetMethod("OnSelect"), typeof(CameraScript).GetMethod("OnSelect"));
+            InGameUI_Restart = instance.Patch(SDK.GetClass("InGameUI").GetMethod("Restart"), typeof(CameraScript).GetMethod("RestartSong"));
+            InGameUI_ReturnToSongList = instance.Patch(SDK.GetClass("InGameUI").GetMethod("ReturnToSongList"), typeof(CameraScript).GetMethod("ReturnToSongList"));
+        }
+
+        public static unsafe void ReturnToSongList(IntPtr @this)
+        {
+            InGameUI_ReturnToSongList.InvokeOriginal(@this);
+            if (!KataConfig.I.practiceMode)
+            {
+                SetFOV(fovSetting);
+            }
+        }
+
+        public static unsafe void RestartSong(IntPtr @this)
+        {
+            InGameUI_Restart.InvokeOriginal(@this);
+            if (!KataConfig.I.practiceMode)
+            {
+                ResetState();
+            }
         }
 
         public static unsafe void SpectatorCamUpdate(IntPtr @this)
@@ -206,7 +243,7 @@ namespace CameraScript
             }
             else
             {
-                CameraScript.SpectatorCam_Update.InvokeOriginal(@this);
+                SpectatorCam_Update.InvokeOriginal(@this);
                 if (isMouseAwake)
                 {
                     isMouseAwake = false;
@@ -217,12 +254,13 @@ namespace CameraScript
         //Tracking selected song
         public static void OnSelect(IntPtr @this)
         {
-            CameraScript.SongSelectItem_OnSelect.InvokeOriginal(@this);
+            SongSelectItem_OnSelect.InvokeOriginal(@this);
 
             SongSelectItem button = new SongSelectItem(@this);
             string songID = button.mSongData.songID;
 
             selectedSong = songID;
+            ResetState();
         }
 
         public override void OnUpdate()
@@ -233,74 +271,83 @@ namespace CameraScript
             //If menu changes
             if (menuState != oldMenuState)
             {
-                oldMenuState = menuState;
                 MelonModLogger.Log("Menu: " + menuState.ToString());
 
-                //Check if camera state has changed
-                CheckCamera();
-
-                if (menuState == MenuState.State.Launched)
+                if (menuState == MenuState.State.MainPage)
                 {
-                    lastTick = 0;
-                    oldLastTick = 0;
-                    currentCameraCueIndex = 0;
+                    CheckCamera();
+                }
+
+                if (menuState == MenuState.State.LaunchPage)
+                {
                     scriptExists = LoadCameraCues();
+                }
+
+                if (menuState == MenuState.State.Launched && !KataConfig.I.practiceMode)
+                {
                     if (scriptExists) { LoadFOV(); }
 
                     Camera thirdPersonCam = spectatorCam.cam;
                     startPointPos = thirdPersonCam.gameObject.transform.position;
                     startPointRot = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
                 }
+
+                if (oldMenuState == MenuState.State.Launched && menuState == MenuState.State.SongPage)
+                {
+                    SetFOV(fovSetting);
+                }
+
+                oldMenuState = menuState;
             }
 
             //If playing a song
-            if (menuState == MenuState.State.Launched)
+            if (menuState == MenuState.State.Launched && !KataConfig.I.practiceMode)
             {
                 //Update midi tick
                 lastTick = ScoreKeeper.I.mLastTick;
-                //if (lastTick < 0) { lastTick = 0; }
+
                 if (lastTick != oldLastTick)
                 {
-                    CameraCue cameraCue = cameraCues[currentCameraCueIndex];
-                    Camera thirdPersonCam = spectatorCam.cam;
-
-                    if (lastTick >= cameraCue.tick && timer <= cameraCue.tickLength && lastTick <= cameraCue.tick + cameraCue.tickLength)
+                    if (camOK && scriptExists)
                     {
-                        timer += lastTick-oldLastTick;
-                        percent = timer / cameraCue.tickLength;
+                        Camera thirdPersonCam = spectatorCam.cam;
+                        CameraCue cameraCue = cameraCues[currentCameraCueIndex];
 
-                        Vector3 destinationPos = new Vector3(cameraCue.xPos, cameraCue.yPos, cameraCue.zPos);
-                        thirdPersonCam.gameObject.transform.position = startPointPos + (destinationPos - startPointPos) * percent;
-
-                        Vector3 destinationRot = new Vector3(cameraCue.xRot, cameraCue.yRot, cameraCue.zRot);
-                        thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(
-                            startPointRot.y + (destinationRot.y - startPointRot.y) * percent,
-                            startPointRot.x + (destinationRot.x - startPointRot.x) * percent,
-                            startPointRot.z + (destinationRot.z - startPointRot.z) * percent
-                            );
-                    }
-
-                    if (lastTick >= cameraCue.tick + cameraCue.tickLength)
-                    {
-                        if (timer != 0)
+                        if (!ended && lastTick >= cameraCue.tick && timer <= cameraCue.tickLength && lastTick <= cameraCue.tick + cameraCue.tickLength)
                         {
+                            timer += lastTick - oldLastTick;
+                            percent = timer / cameraCue.tickLength;
+
                             Vector3 destinationPos = new Vector3(cameraCue.xPos, cameraCue.yPos, cameraCue.zPos);
-                            thirdPersonCam.gameObject.transform.position = destinationPos;
+                            thirdPersonCam.gameObject.transform.position = startPointPos + (destinationPos - startPointPos) * percent;
 
                             Vector3 destinationRot = new Vector3(cameraCue.xRot, cameraCue.yRot, cameraCue.zRot);
-                            thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(destinationRot.y, destinationRot.x, destinationRot.z);
+                            thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(
+                                startPointRot.y + (destinationRot.y - startPointRot.y) * percent,
+                                startPointRot.x + (destinationRot.x - startPointRot.x) * percent,
+                                startPointRot.z + (destinationRot.z - startPointRot.z) * percent
+                                );
+                        }
 
-                            startPointPos = thirdPersonCam.gameObject.transform.position;
-                            startPointRot = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
-                            timer = 0;
-
-                            if (cameraCues.Length > currentCameraCueIndex + 1)
+                        if (!ended && lastTick >= cameraCue.tick + cameraCue.tickLength)
+                        {
+                            if (timer != 0)
                             {
-                                currentCameraCueIndex += 1;
+                                Vector3 destinationPos = new Vector3(cameraCue.xPos, cameraCue.yPos, cameraCue.zPos);
+                                thirdPersonCam.gameObject.transform.position = destinationPos;
+
+                                Vector3 destinationRot = new Vector3(cameraCue.xRot, cameraCue.yRot, cameraCue.zRot);
+                                thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(destinationRot.y, destinationRot.x, destinationRot.z);
+
+                                startPointPos = thirdPersonCam.gameObject.transform.position;
+                                startPointRot = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
+                                timer = 0;
+
+                                if (cameraCues.Length > currentCameraCueIndex + 1) { currentCameraCueIndex += 1; }
+                                else { ended = true; }
                             }
                         }
                     }
-
                     oldLastTick = lastTick;
                 }
             }
