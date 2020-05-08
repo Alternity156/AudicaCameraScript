@@ -32,7 +32,7 @@ namespace CameraScript
             return cameraCues;
         }
 
-        public static int GetFOV(string data)
+        public static float GetFOV(string data)
         {
             var cameraCuesJSON = JSON.Parse(data);
 

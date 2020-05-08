@@ -43,15 +43,17 @@ namespace CameraScript
         public static MenuState.State oldMenuState;
 
         public static string selectedSong;
+        public static float fovSetting;
 
         public static CameraCue[] cameraCues;
-        public static int fov;
+        public static float tempFov;
 
         public static float lastTick;
         public static float oldLastTick;
 
         public static int currentCameraCueIndex;
-        public static Vector3 startPoint;
+        public static Vector3 startPointPos;
+        public static Vector3 startPointRot;
 
         public static float timer;
         public static float percent;
@@ -106,7 +108,18 @@ namespace CameraScript
         public static void LoadFOV()
         {
             string path = dir + selectedSong + ".json";
-            fov = Decoder.GetFOV(File.ReadAllText(path));
+            tempFov = Decoder.GetFOV(File.ReadAllText(path));
+
+            fovSetting = PlayerPreferences.I.SpectatorCamFOV.Get();
+            SetFOV(tempFov);
+        }
+
+        public static void SetFOV(float fov)
+        {
+            PlayerPreferences.I.SpectatorCamFOV.Set(fov);
+            spectatorCam.mFov = fov;
+            spectatorCam.UpdateSettings();
+            spectatorCam.UpdateFOV();
         }
 
         public override void OnApplicationStart()
@@ -235,7 +248,8 @@ namespace CameraScript
                     if (scriptExists) { LoadFOV(); }
 
                     Camera thirdPersonCam = spectatorCam.cam;
-                    startPoint = thirdPersonCam.gameObject.transform.position;
+                    startPointPos = thirdPersonCam.gameObject.transform.position;
+                    startPointRot = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
                 }
             }
 
@@ -244,34 +258,47 @@ namespace CameraScript
             {
                 //Update midi tick
                 lastTick = ScoreKeeper.I.mLastTick;
-                if (lastTick < 0) { lastTick = 0; }
+                //if (lastTick < 0) { lastTick = 0; }
                 if (lastTick != oldLastTick)
                 {
                     CameraCue cameraCue = cameraCues[currentCameraCueIndex];
+                    Camera thirdPersonCam = spectatorCam.cam;
 
                     if (lastTick >= cameraCue.tick && timer <= cameraCue.tickLength && lastTick <= cameraCue.tick + cameraCue.tickLength)
                     {
-                        Camera thirdPersonCam = spectatorCam.cam;
-
                         timer += lastTick-oldLastTick;
                         percent = timer / cameraCue.tickLength;
 
                         Vector3 destinationPos = new Vector3(cameraCue.xPos, cameraCue.yPos, cameraCue.zPos);
+                        thirdPersonCam.gameObject.transform.position = startPointPos + (destinationPos - startPointPos) * percent;
+
                         Vector3 destinationRot = new Vector3(cameraCue.xRot, cameraCue.yRot, cameraCue.zRot);
+                        thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(
+                            startPointRot.y + (destinationRot.y - startPointRot.y) * percent,
+                            startPointRot.x + (destinationRot.x - startPointRot.x) * percent,
+                            startPointRot.z + (destinationRot.z - startPointRot.z) * percent
+                            );
+                    }
 
-                        thirdPersonCam.gameObject.transform.position = startPoint + (destinationPos - startPoint) * percent;
-
-                        if (timer >= cameraCue.tickLength)
+                    if (lastTick >= cameraCue.tick + cameraCue.tickLength)
+                    {
+                        if (timer != 0)
                         {
-                            startPoint = thirdPersonCam.gameObject.transform.position;
+                            Vector3 destinationPos = new Vector3(cameraCue.xPos, cameraCue.yPos, cameraCue.zPos);
+                            thirdPersonCam.gameObject.transform.position = destinationPos;
+
+                            Vector3 destinationRot = new Vector3(cameraCue.xRot, cameraCue.yRot, cameraCue.zRot);
+                            thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(destinationRot.y, destinationRot.x, destinationRot.z);
+
+                            startPointPos = thirdPersonCam.gameObject.transform.position;
+                            startPointRot = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
                             timer = 0;
 
-                            if (cameraCues.Length > currentCameraCueIndex)
+                            if (cameraCues.Length > currentCameraCueIndex + 1)
                             {
                                 currentCameraCueIndex += 1;
                             }
                         }
-
                     }
 
                     oldLastTick = lastTick;
