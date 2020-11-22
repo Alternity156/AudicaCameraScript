@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
-using Il2CppSystem.Linq;
+using System;
+using System.Collections.Generic;
 using MelonLoader;
-using NET_SDK;
-using NET_SDK.Harmony;
 using UnityEngine;
+using OVRSimpleJSON;
+using System.IO;
+using Harmony;
 
-namespace CameraScript
+namespace AudicaModding
 {
-    public static class BuildInfo
+    public class AudicaMod : MelonMod
     {
-        public const string Name = "CameraScript"; // Name of the Mod.  (MUST BE SET)
-        public const string Author = "Alternity"; // Author of the Mod.  (Set as null if none)
-        public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "0.1.0"; // Version of the Mod.  (MUST BE SET)
-        public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
-    }
-
-    public class CameraScript : MelonMod
-    {
-        public static Patch SpectatorCam_Update;
-        public static Patch SongSelectItem_OnSelect;
-        public static Patch InGameUI_Restart;
-        public static Patch InGameUI_ReturnToSongList;
+        public static class BuildInfo
+        {
+            public const string Name = "CameraScript";  // Name of the Mod.  (MUST BE SET)
+            public const string Author = "Alternity"; // Author of the Mod.  (Set as null if none)
+            public const string Company = null; // Company that made the Mod.  (Set as null if none)
+            public const string Version = "0.1.1"; // Version of the Mod.  (MUST BE SET)
+            public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
+        }
 
         public static Vector3 debugTextPos = new Vector3(0f, -1f, 5f);
 
@@ -62,7 +57,7 @@ namespace CameraScript
         public static float percent;
 
         //Function to get the time a tick lasts in miliseconds
-        public static float  GetTickTime(float bpm)
+        public static float GetTickTime(float bpm)
         {
             return 60000 / (bpm * 480);
         }
@@ -85,8 +80,10 @@ namespace CameraScript
                         spectatorCam = UnityEngine.Object.FindObjectOfType<SpectatorCam>();
                         camOK = true;
                     }
-                } else { camOK = false; }
-            } else { camOK = false; }
+                }
+                else { camOK = false; }
+            }
+            else { camOK = false; }
         }
 
         public static void MouseAwake()
@@ -139,130 +136,6 @@ namespace CameraScript
             KataConfig.I.CreateDebugText(text, debugTextPos, 5f, null, persistent: false, 0.2f);
         }
 
-        public override void OnApplicationStart()
-        {
-            if (!Directory.Exists(dir)) { Directory.CreateDirectory(Application.dataPath + "/../Mods/Config/CameraScript"); }
-
-            Instance instance = Manager.CreateInstance("CameraScript");
-
-            SpectatorCam_Update = instance.Patch(SDK.GetClass("SpectatorCam").GetMethod("Update"), typeof(CameraScript).GetMethod("SpectatorCamUpdate"));
-            SongSelectItem_OnSelect = instance.Patch(SDK.GetClass("SongSelectItem").GetMethod("OnSelect"), typeof(CameraScript).GetMethod("OnSelect"));
-            InGameUI_Restart = instance.Patch(SDK.GetClass("InGameUI").GetMethod("Restart"), typeof(CameraScript).GetMethod("RestartSong"));
-            InGameUI_ReturnToSongList = instance.Patch(SDK.GetClass("InGameUI").GetMethod("ReturnToSongList"), typeof(CameraScript).GetMethod("ReturnToSongList"));
-        }
-
-        public static unsafe void ReturnToSongList(IntPtr @this)
-        {
-            InGameUI_ReturnToSongList.InvokeOriginal(@this);
-            if (!KataConfig.I.practiceMode)
-            {
-                SetFOV(fovSetting);
-            }
-        }
-
-        public static unsafe void RestartSong(IntPtr @this)
-        {
-            InGameUI_Restart.InvokeOriginal(@this);
-            if (!KataConfig.I.practiceMode)
-            {
-                ResetState();
-            }
-        }
-
-        public static unsafe void SpectatorCamUpdate(IntPtr @this)
-        {
-            if (camOK)
-            {
-                Camera thirdPersonCam = spectatorCam.cam;
-
-                if (!isMouseAwake) { MouseAwake(); }
-
-                if (Input.GetKey(KeyCode.W))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.forward;
-                }
-                
-                if (Input.GetKey(KeyCode.S))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.forward;
-                }
-
-                if (Input.GetKey(KeyCode.A))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.right;
-                }
-                
-                if (Input.GetKey(KeyCode.D))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.right;
-                }
-
-                if (Input.GetKey(KeyCode.Space))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.up;
-                }
-                
-                if (Input.GetKey(KeyCode.C))
-                {
-                    thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.up;
-                }
-
-                if (Input.GetKey(KeyCode.Mouse1))
-                {
-                    float MIN_X = 0.0f;
-                    float MAX_X = 360.0f;
-                    float MIN_Y = -90.0f;
-                    float MAX_Y = 90.0f;
-
-                    xAxis += Input.GetAxis("Mouse X") * (mouseSensitivity * Time.deltaTime);
-                    /*
-                    if (xAxis < MIN_X) xAxis = MIN_X;
-                    else if (xAxis > MAX_X) xAxis = MAX_X;
-                    */
-
-                    yAxis -= Input.GetAxis("Mouse Y") * (mouseSensitivity * Time.deltaTime);
-                    /*
-                    if (yAxis < MIN_Y) yAxis = MIN_Y;
-                    else if (yAxis > MAX_Y) yAxis = MAX_Y;
-                    */
-
-                    thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(yAxis, xAxis, 0.0f);
-                }
-
-                if (Input.GetKey(KeyCode.Z))
-                {
-                    Vector3 euler = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
-                    thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(euler.y, euler.x, euler.z + 1.0f);
-                }
-
-                if (Input.GetKey(KeyCode.X))
-                {
-                    Vector3 euler = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
-                    thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(euler.y, euler.x, euler.z - 1.0f);
-                }
-            }
-            else
-            {
-                SpectatorCam_Update.InvokeOriginal(@this);
-                if (isMouseAwake)
-                {
-                    isMouseAwake = false;
-                }
-            }
-        }
-
-        //Tracking selected song
-        public static void OnSelect(IntPtr @this)
-        {
-            SongSelectItem_OnSelect.InvokeOriginal(@this);
-
-            SongSelectItem button = new SongSelectItem(@this);
-            string songID = button.mSongData.songID;
-
-            selectedSong = songID;
-            ResetState();
-        }
-
         public override void OnUpdate()
         {
             //Tracking menu state
@@ -271,7 +144,7 @@ namespace CameraScript
             //If menu changes
             if (menuState != oldMenuState)
             {
-                MelonModLogger.Log("Menu: " + menuState.ToString());
+                MelonLogger.Log("Menu: " + menuState.ToString());
 
                 if (menuState == MenuState.State.MainPage)
                 {
@@ -378,49 +251,194 @@ namespace CameraScript
                 Camera thirdPersonCam = spectatorCam.cam;
 
                 Vector3 camPos = thirdPersonCam.gameObject.transform.position;
-                MelonModLogger.Log("Cam Pos: " + camPos.ToString());
+                MelonLogger.Log("Cam Pos: " + camPos.ToString());
 
                 Vector3 euler = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
-                MelonModLogger.Log("Cam Rot: " + euler.ToString());
+                MelonLogger.Log("Cam Rot: " + euler.ToString());
             }
-            
+
+        }
+    }
+    public class CameraCue
+    {
+        public int tick;
+        public int tickLength;
+        public float xPos;
+        public float yPos;
+        public float zPos;
+        public float xRot;
+        public float yRot;
+        public float zRot;
+    }
+    public class Decoder
+    {
+        public static CameraCue[] GetCameraCues(string data)
+        {
+            var cameraCuesJSON = JSON.Parse(data);
+
+            CameraCue[] cameraCues = new CameraCue[cameraCuesJSON["cameraCues"].Count];
+
+            for (int i = 0; i < cameraCuesJSON["cameraCues"].Count; i++)
+            {
+                CameraCue cameraCue = new CameraCue
+                {
+                    tick = cameraCuesJSON["cameraCues"][i]["tick"],
+                    tickLength = cameraCuesJSON["cameraCues"][i]["tickLength"],
+                    xPos = cameraCuesJSON["cameraCues"][i]["xPos"],
+                    yPos = cameraCuesJSON["cameraCues"][i]["yPos"],
+                    zPos = cameraCuesJSON["cameraCues"][i]["zPos"],
+                    xRot = cameraCuesJSON["cameraCues"][i]["xRot"],
+                    yRot = cameraCuesJSON["cameraCues"][i]["yRot"],
+                    zRot = cameraCuesJSON["cameraCues"][i]["zRot"]
+                };
+
+                cameraCues[i] = cameraCue;
+            }
+
+            return cameraCues;
         }
 
-        /*
-        public override void OnApplicationQuit()
+        public static float GetFOV(string data)
         {
-            MelonModLogger.Log("OnApplicationQuit");
+            var cameraCuesJSON = JSON.Parse(data);
+
+            return cameraCuesJSON["fov"];
+        }
+    }
+
+    internal static class Hooks
+    {
+        [HarmonyPatch(typeof(SongSelectItem), "OnSelect")]
+        private static class SongSelectItemOnSelectPatch
+        {
+            private static void Postfix(SongSelectItem __instance)
+            {
+                string songID = __instance.mSongData.songID;
+
+                AudicaMod.selectedSong = songID;
+                AudicaMod.ResetState();
+            }
         }
 
-        public override void OnLevelWasLoaded(int level)
+        [HarmonyPatch(typeof(InGameUI), "ReturnToSongList")]
+        private static class ReturnToSongListPatch
         {
-            MelonModLogger.Log("OnLevelWasLoaded: " + level.ToString());
+            private static void Postfix(InGameUI __instance)
+            {
+                if (!KataConfig.I.practiceMode)
+                {
+                    AudicaMod.SetFOV(AudicaMod.fovSetting);
+                }
+            }
         }
 
-        public override void OnLevelWasInitialized(int level)
+        [HarmonyPatch(typeof(InGameUI), "Restart")]
+        private static class RestartPatch
         {
-            MelonModLogger.Log("OnLevelWasInitialized: " + level.ToString());
+            private static void Postfix(InGameUI __instance)
+            {
+                if (!KataConfig.I.practiceMode)
+                {
+                    AudicaMod.ResetState();
+                }
+            }
         }
 
-        public override void OnFixedUpdate()
+        [HarmonyPatch(typeof(SpectatorCam), "Update")]
+        private static class SpectatorCamUpdatePatch
         {
-            MelonModLogger.Log("OnFixedUpdate");
-        }
+            private static bool Prefix(SpectatorCam __instance)
+            {
+                if (AudicaMod.camOK)
+                {
+                    return false;
+                }
+                else
+                {
+                    if (AudicaMod.isMouseAwake)
+                    {
+                        AudicaMod.isMouseAwake = false;
+                    }
+                    return true;
+                }
+            }
+            private static void Postfix(SpectatorCam __instance)
+            {
+                if (AudicaMod.camOK)
+                {
+                    Camera thirdPersonCam = AudicaMod.spectatorCam.cam;
 
-        public override void OnLateUpdate()
-        {
-            MelonModLogger.Log("OnLateUpdate");
-        }
+                    if (!AudicaMod.isMouseAwake) { AudicaMod.MouseAwake(); }
 
-        public override void OnGUI()
-        {
-            MelonModLogger.Log("OnGUI");
-        }
+                    if (Input.GetKey(KeyCode.W))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.forward;
+                    }
 
-        public override void OnModSettingsApplied()
-        {
-            MelonModLogger.Log("OnModSettingsApplied");
+                    if (Input.GetKey(KeyCode.S))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.forward;
+                    }
+
+                    if (Input.GetKey(KeyCode.A))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.right;
+                    }
+
+                    if (Input.GetKey(KeyCode.D))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.right;
+                    }
+
+                    if (Input.GetKey(KeyCode.Space))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position + thirdPersonCam.gameObject.transform.up;
+                    }
+
+                    if (Input.GetKey(KeyCode.C))
+                    {
+                        thirdPersonCam.gameObject.transform.position = thirdPersonCam.gameObject.transform.position - thirdPersonCam.gameObject.transform.up;
+                    }
+
+                    if (Input.GetKey(KeyCode.Mouse1))
+                    {
+                        float MIN_X = 0.0f;
+                        float MAX_X = 360.0f;
+                        float MIN_Y = -90.0f;
+                        float MAX_Y = 90.0f;
+
+                        AudicaMod.xAxis += Input.GetAxis("Mouse X") * (AudicaMod.mouseSensitivity * Time.deltaTime);
+                        /*
+                        if (xAxis < MIN_X) xAxis = MIN_X;
+                        else if (xAxis > MAX_X) xAxis = MAX_X;
+                        */
+
+                        AudicaMod.yAxis -= Input.GetAxis("Mouse Y") * (AudicaMod.mouseSensitivity * Time.deltaTime);
+                        /*
+                        if (yAxis < MIN_Y) yAxis = MIN_Y;
+                        else if (yAxis > MAX_Y) yAxis = MAX_Y;
+                        */
+
+                        thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(AudicaMod.yAxis, AudicaMod.xAxis, 0.0f);
+                    }
+
+                    if (Input.GetKey(KeyCode.Z))
+                    {
+                        Vector3 euler = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
+                        thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(euler.y, euler.x, euler.z + 1.0f);
+                    }
+
+                    if (Input.GetKey(KeyCode.X))
+                    {
+                        Vector3 euler = thirdPersonCam.gameObject.transform.rotation.eulerAngles;
+                        thirdPersonCam.gameObject.transform.rotation = Quaternion.Euler(euler.y, euler.x, euler.z - 1.0f);
+                    }
+
+                }
+            }
         }
-        */
     }
 }
+
+
+
