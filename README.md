@@ -3,7 +3,7 @@
 
 This mod is currently a WIP, may not work as intended.
 
-Once you boot the game, it will create a folder in /Audica/Mods/Config/CameraScript where you can place files with name songid.json that contains camera cues.
+Once you boot the game, it will create a folder in /Audica/Mods/CameraScript where you can place files with name songid.json that contains camera cues.
 
 The spectator camera must be set to static third person. The mod will know it changed when you go back to the main menu.
 
